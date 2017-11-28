@@ -38,8 +38,44 @@ class UserRatingsPlugin(plugins.BeetsPlugin):
             'overwrite': False,
         })
 
+        # Given the complexity of the storage style implementations, I
+        # find it handy to allow them to do unified logging.
         userrating_field = mediafile.MediaField(
+            MP3UserRatingStorageStyle(_log=self._log),
             out_type=int
         )
 
         self.add_media_field('userrating', userrating_field)
+
+class MP3UserRatingStorageStyle(mediafile.MP3StorageStyle):
+    """
+    A codec for MP3 user ratings in files.
+
+    Since we chose to use POPM as our baseline,, we don't have to do
+    any conversion, just look for the various possible tags
+
+    """
+
+    def __init__(self, **kwargs):
+        self._log = kwargs.get ('_log')
+        super(MP3UserRatingStorageStyle, self).__init__("POPM")
+
+    # The ordered list of which "email" entries we will look
+    # for/prioritize in POPM tags.  Should eventually be configurable.
+    popm_order = ["Banshee"]
+
+    def get(self, mutagen_file):
+        # Create a map of all our email -> rating entries
+        user_ratings = {frame.email: frame.rating for frame in mutagen_file.tags.getall("POPM")}
+        # Find the first entry from popm_order, or None
+        return next((user_ratings.get(user) for user in self.popm_order if user in user_ratings), None)
+
+    def get_list(self, mutagen_file):
+        raise NotImplementedError(u'MP3 Rating storage does not support lists')
+
+    def set(self, mutagen_file, value):
+        for user in self.popm_order:
+            mutagen_file["POPM:{0}".format (user)] = value;
+
+    def set_list(self, mutagen_file, values):
+        raise NotImplementedError(u'MP3 Rating storage does not support lists')
