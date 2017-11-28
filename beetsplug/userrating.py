@@ -42,6 +42,7 @@ class UserRatingsPlugin(plugins.BeetsPlugin):
         # find it handy to allow them to do unified logging.
         userrating_field = mediafile.MediaField(
             MP3UserRatingStorageStyle(_log=self._log),
+            UserRatingStorageStyle(_log=self._log),
             out_type=int
         )
 
@@ -79,3 +80,32 @@ class MP3UserRatingStorageStyle(mediafile.MP3StorageStyle):
 
     def set_list(self, mutagen_file, values):
         raise NotImplementedError(u'MP3 Rating storage does not support lists')
+
+class UserRatingStorageStyle(mediafile.StorageStyle):
+    """
+    A codec for user ratings in files using a generic key=value
+    format.
+    """
+
+    def __init__(self, **kwargs):
+        self._log = kwargs.get ('_log')
+        # We don't have a set tag
+        super(UserRatingStorageStyle, self).__init__("")
+
+    # The ordered list of which "email" entries we will look
+    # for/prioritize in POPM tags.  Should eventually be configurable.
+    rating_order = ["RATING:BANSHEE"]
+
+    def get(self, mutagen_file):
+        return next((int (float (mutagen_file.get (tag)[0]) * 255) for tag in self.rating_order if tag in mutagen_file), None)
+
+    def get_list(self, mutagen_file):
+        raise NotImplementedError(u'UserRating storage does not support lists')
+
+    def set(self, mutagen_file, value):
+        for tag in self.rating_order:
+            val = value / 255
+            mutagen_file[tag] = val
+
+    def set_list(self, mutagen_file, values):
+        raise NotImplementedError(u'UserRating storage does not support lists')
